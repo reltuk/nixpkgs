@@ -14895,7 +14895,8 @@ in modules // {
       testsToSkip = ["test_data" "test_excel" "test_html" "test_json"
                      "test_frequencies" "test_frame"
                      "test_read_clipboard_infer_excel"
-                     "test_interp_alt_scipy" "test_nanops" "test_stats"] ++
+                     "test_interp_alt_scipy" "test_nanops" "test_stats"
+                     "test_sparse_series_ops"] ++
                     optional isPy35 "test_sql";
     in ''
       runHook preCheck
@@ -14969,7 +14970,7 @@ in modules // {
     # The test_sql checks fail specifically on python 3.5; see here:
     # https://github.com/pydata/pandas/issues/11112
     checkPhase = let
-      testsToSkip = [];
+      testsToSkip = [ "test_range_slice_day" "test_range_slice_seconds" ];
     in ''
       runHook preCheck
       # The flag `-A 'not network'` will disable tests that use internet.
