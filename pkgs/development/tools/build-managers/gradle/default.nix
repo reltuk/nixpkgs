@@ -1,8 +1,10 @@
-{ stdenv, fetchurl, unzip, jdk, makeWrapper, patchelf }:
+{ stdenv, fetchurl, unzip, jdk, makeWrapper }:
 
 rec {
   gradleGen = {name, src} : stdenv.mkDerivation rec {
     inherit name src;
+
+    buildPhase = ":";
 
     installPhase = ''
       mkdir -pv $out/lib/gradle/
@@ -15,19 +17,14 @@ rec {
         --add-flags "-classpath $gradle_launcher_jar org.gradle.launcher.GradleMain"
     '';
 
-    libnativeFixup =
-      let
-        arch =
-          { "x86_64-linux" = "linux-amd64";
-            "i686-linux" = "linux-i386";
-          }."${stdenv.system}" or "";
-       in ''
+    fixupPhase = if (!stdenv.isLinux) then ":" else
+      let arch = if stdenv.is64bit then "amd64" else "i386"; in ''
         mkdir patching
         pushd patching
-        jar xf $out/lib/gradle/lib/native-platform-${arch}-0.10.jar
-        ${patchelf}/bin/patchelf --set-rpath "${stdenv.cc.cc}/lib:${stdenv.cc.cc}/lib64" net/rubygrapefruit/platform/${arch}/libnative-platform.so
-        jar cf native-platform-${arch}-0.10.jar .
-        mv native-platform-${arch}-0.10.jar $out/lib/gradle/lib/
+        jar xf $out/lib/gradle/lib/native-platform-linux-${arch}-0.10.jar
+        patchelf --set-rpath "${stdenv.cc.cc}/lib:${stdenv.cc.cc}/lib64" net/rubygrapefruit/platform/linux-${arch}/libnative-platform.so
+        jar cf native-platform-linux-${arch}-0.10.jar .
+        mv native-platform-linux-${arch}-0.10.jar $out/lib/gradle/lib/
         popd
 
         # The scanner doesn't pick up the runtime dependency in the jar.
@@ -35,9 +32,6 @@ rec {
         mkdir $out/nix-support
         echo ${stdenv.cc.cc} > $out/nix-support/manual-runtime-dependencies
       '';
-
-    fixupPhase = if stdenv.isLinux then libnativeFixup else "true";
-    buildPhase = "true";
 
     buildInputs = [ unzip jdk makeWrapper ];
 
