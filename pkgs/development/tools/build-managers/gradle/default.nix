@@ -15,39 +15,31 @@ rec {
         --add-flags "-classpath $gradle_launcher_jar org.gradle.launcher.GradleMain"
     '';
 
-    fixupPhase =
+    libnativeFixup =
       let
         arch =
-          if stdenv.system == "x86_64-linux" then "linux-amd64"
-          else if stdenv.system == "i686-linux" then "linux-i386"
-          else "";
-       in
-    ''
-      if [ -n "${arch}" ]; then
+          { "x86_64-linux" = "linux-amd64";
+            "i686-linux" = "linux-i386";
+          }."${stdenv.system}" or "";
+       in ''
         mkdir patching
         pushd patching
         jar xf $out/lib/gradle/lib/native-platform-${arch}-0.10.jar
-        patchelf --set-rpath "${stdenv.cc.cc}/lib:${stdenv.cc.cc}/lib64" net/rubygrapefruit/platform/${arch}/libnative-platform.so
+        ${patchelf}/bin/patchelf --set-rpath "${stdenv.cc.cc}/lib:${stdenv.cc.cc}/lib64" net/rubygrapefruit/platform/${arch}/libnative-platform.so
         jar cf native-platform-${arch}-0.10.jar .
         mv native-platform-${arch}-0.10.jar $out/lib/gradle/lib/
         popd
 
         # The scanner doesn't pick up the runtime dependency in the jar.
         # Manually add a reference where it will be found.
-        echo ${stdenv.cc.cc} > $out/nix_references
-      fi
-    '';
+        mkdir $out/nix-support
+        echo ${stdenv.cc.cc} > $out/nix-support/manual-runtime-dependencies
+      '';
 
-    phases = "unpackPhase installPhase fixupPhase";
+    fixupPhase = if stdenv.isLinux then libnativeFixup else "true";
+    buildPhase = "true";
 
-    buildInputs = [
-      unzip
-      jdk
-      makeWrapper
-    ] ++ (if stdenv.system == "x86_64-linux" || stdenv.system == "i686-linux" then [
-      patchelf
-      stdenv.cc
-    ] else []);
+    buildInputs = [ unzip jdk makeWrapper ];
 
     meta = {
       description = "Enterprise-grade build system";
